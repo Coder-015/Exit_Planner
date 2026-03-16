@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Intelligent Emergency Exit Planner 3D</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <!-- Three.js and modules -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- GSAP for Animations -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+</head>
+<body>
+    <!-- 3D WebGL Canvas Container -->
+    <div id="canvas-container"></div>
+
+    <div class="hud-container">
+        <!-- Into cinematic and modal go here (full screen overlays) -->
+        <!-- Simulation Modal / Overlay for Results -->
+
+        <!-- Simulation Modal / Overlay for Results -->
+        <div id="results-modal" class="modal-overlay hidden">
+            <div class="modal-content glass-panel">
+                <h2 id="modal-title" class="glow-text_green">Simulation complete!</h2>
+                <div class="comparison-grid">
+                    <div class="card player-card">
+                        <h3>Human Attempt</h3>
+                        <p>Time: <span id="res-human-time">0</span>s</p>
+                        <p>Result: <span id="res-human-status">Trapped</span></p>
+                    </div>
+                    <div class="card ai-card">
+                        <h3>AI Attempt (A*)</h3>
+                        <p>Time: <span id="res-ai-time">0</span>s</p>
+                        <p>Safe Path Length: <span id="res-ai-cost">0</span></p>
+                        <p>A* Nodes: <span id="res-ai-nodes">0</span></p>
+                        <p style="color:var(--text-muted); font-size: 0.85rem; margin-top:2px;">BFS Nodes: <span id="res-ai-nodes-bfs">0</span></p>
+                    </div>
+                </div>
+                <button class="btn primary mt-4" onclick="closeModalAndReset()">Play Again</button>
+            </div>
+        </div>
+        
+        <!-- Intro cinematic overlay -->
+        <div id="intro-overlay" class="intro-overlay">
+            <div class="intro-content">
+                <h1 class="cinematic-title">EMERGENCY EXIT PLANNER</h1>
+                <p>Initializing Building Topography...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar Controls Overlay (Moved outside HUD container to guarantee clicks) -->
+    <aside class="sidebar glass-panel" style="display: none;">
+        <h1 class="logo glow-text_red">Emergency <span>Planner</span></h1>
+        
+        <div class="phase-indicator">
+            <div class="phase-badge active" id="phase1-badge">Phase 1: Human</div>
+            <div class="phase-badge" id="phase2-badge">Phase 2: AI (A*)</div>
+        </div>
+
+        <div class="controls-section">
+            <h2>Simulation Controls</h2>
+            <div class="btn-group">
+                <button class="btn primary" id="btn-start" onclick="startSim()">Start Simulation</button>
+                <button class="btn secondary" id="btn-generate" onclick="generateNewMap()">Generate New Map</button>
+            </div>
+        </div>
+
+        <div class="status-panel mt-4">
+            <h2>Live Status</h2>
+            <div class="metric-row">
+                <span class="metric-label">Mode:</span>
+                <span class="metric-value" id="val-mode">Loading...</span>
+            </div>
+            <div class="metric-row">
+                <span class="metric-label">Time Elapsed:</span>
+                <span class="metric-value timer-glow" id="val-timer">00:00.0</span>
+            </div>
+        </div>
+
+        <div class="metrics-panel mt-4" id="ai-metrics" style="display: none;">
+            <h2>AI Performance</h2>
+            <div class="metric-row">
+                <span class="metric-label">Path Cost:</span>
+                <span class="metric-value highlight" id="val-cost">-</span>
+            </div>
+            <div class="metric-row">
+                <span class="metric-label">Nodes (A*):</span>
+                <span class="metric-value highlight" id="val-nodes">-</span>
+            </div>
+            <div class="metric-row">
+                <span class="metric-label">Nodes (BFS):</span>
+                <span class="metric-value" id="val-nodes-bfs" style="color:var(--text-muted);">-</span>
+            </div>
+            <div class="metric-row">
+                <span class="metric-label">Compute Time:</span>
+                <span class="metric-value highlight" id="val-compute-time">-</span>
+            </div>
+        </div>
+        
+        <div class="instructions mt-4" id="human-instructions">
+            <strong>Controls:</strong> Use <strong>W A S D</strong> or <strong>Arrows</strong> to manually navigate to the glowing green exit! Avoid the red flames. Mouse drag to rotate camera.
+        </div>
+
+    </aside>
+
+    <!-- Scripts -->
+    <script src="js/map.js"></script>
+    <script src="js/ai.js"></script>
+    <script src="js/engine3d.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
