@@ -1,110 +1,344 @@
 <!DOCTYPE html>
-<html lang="en">
+<html class="dark" lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Intelligent Emergency Exit Planner 3D</title>
-    <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <!-- Three.js and modules -->
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Aegis Simulation | Intelligent Emergency Exit Planner</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@300;400;500;700&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#00E5FF",
+                        secondary: "#FF5722",
+                        tertiary: "#b6ffae",
+                        surface: "#0a0a0a",
+                        "surface-container": "#161616",
+                        "surface-container-low": "#1c1b1b",
+                        "on-surface": "#e5e2e1",
+                        "on-surface-variant": "#bac9cc",
+                        "outline-variant": "#3b494c"
+                    },
+                    fontFamily: {
+                        headline: ["Space Grotesk"],
+                        body: ["Inter"],
+                        label: ["Space Grotesk"]
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #0a0a0a;
+            color: #e5e2e1;
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+            margin: 0;
+            padding: 0;
+        }
+        #canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: -1;
+        }
+        .hud-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none;
+        }
+        .pointer-events-auto { pointer-events: auto; }
+        
+        .blueprint-grid {
+            background-image: 
+                linear-gradient(to right, rgba(0, 229, 255, 0.05) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(0, 229, 255, 0.05) 1px, transparent 1px);
+            background-size: 40px 40px;
+            animation: grid-move 20s linear infinite;
+        }
+        @keyframes grid-move {
+            0% { background-position: 0 0; }
+            100% { background-position: 40px 40px; }
+        }
+        .scanlines {
+            background: linear-gradient(to bottom, rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 10;
+        }
+        .glass {
+            backdrop-filter: blur(12px);
+            background-color: rgba(22, 22, 22, 0.7);
+        }
+        .glow-border {
+            box-shadow: 0 0 15px rgba(0, 229, 255, 0.15), inset 0 0 1px rgba(0, 229, 255, 0.3);
+            border-color: rgba(0, 229, 255, 0.2);
+        }
+        .logo-glitch {
+            text-shadow: 0.05em 0 0 rgba(255, 0, 80, 0.75), -0.025em -0.05em 0 rgba(0, 255, 0, 0.75), 0.025em 0.05em 0 rgba(0, 0, 255, 0.75);
+            animation: glitch 500ms infinite;
+        }
+        @keyframes glitch {
+            0% { text-shadow: 0.05em 0 0 rgba(255,0,80,.75), -0.05em -0.025em 0 rgba(0,255,0,.75), -0.025em 0.05em 0 rgba(0,0,255,.75); }
+            15% { text-shadow: -0.05em -0.025em 0 rgba(255,0,80,.75), 0.025em 0.025em 0 rgba(0,255,0,.75), -0.05em -0.05em 0 rgba(0,0,255,.75); }
+            50% { text-shadow: 0.025em 0.05em 0 rgba(255,0,80,.75), 0.05em 0 0 rgba(0,255,0,.75), 0 -0.05em 0 rgba(0,0,255,.75); }
+            100% { text-shadow: -0.025em 0 0 rgba(255,0,80,.75), -0.025em -0.025em 0 rgba(0,255,0,.75), -0.025em -0.05em 0 rgba(0,0,255,.75); }
+        }
+        .ticker-wrap {
+            width: 100%;
+            overflow: hidden;
+            background: rgba(0, 0, 0, 0.6);
+            border-top: 1px solid rgba(0, 229, 255, 0.2);
+            position: absolute;
+            bottom: 0;
+            z-index: 50;
+        }
+        .ticker {
+            display: flex;
+            white-space: nowrap;
+            animation: ticker-move 20s linear infinite;
+        }
+        @keyframes ticker-move {
+            0% { transform: translateX(100%); }
+            100% { transform: translateX(-100%); }
+        }
+        .intro-overlay {
+            position: absolute;
+            inset: 0;
+            background-color: #0a0a0a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            pointer-events: auto;
+        }
+    </style>
+
+    <!-- Three.js and GSAP -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-    <!-- GSAP for Animations -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
 </head>
-<body>
-    <!-- 3D WebGL Canvas Container -->
+<body class="blueprint-grid">
+    <div class="scanlines fixed inset-0"></div>
     <div id="canvas-container"></div>
-
+    
     <div class="hud-container">
-        <!-- Into cinematic and modal go here (full screen overlays) -->
-        <!-- Simulation Modal / Overlay for Results -->
 
-        <!-- Simulation Modal / Overlay for Results -->
-        <div id="results-modal" class="modal-overlay hidden">
-            <div class="modal-content glass-panel">
-                <h2 id="modal-title" class="glow-text_green">Simulation complete!</h2>
-                <div class="comparison-grid">
-                    <div class="card player-card">
-                        <h3>Human Attempt</h3>
-                        <p>Time: <span id="res-human-time">0</span>s</p>
-                        <p>Result: <span id="res-human-status">Trapped</span></p>
-                    </div>
-                    <div class="card ai-card">
-                        <h3>AI Attempt (A*)</h3>
-                        <p>Time: <span id="res-ai-time">0</span>s</p>
-                        <p>Safe Path Length: <span id="res-ai-cost">0</span></p>
-                        <p>A* Nodes: <span id="res-ai-nodes">0</span></p>
-                        <p style="color:var(--text-muted); font-size: 0.85rem; margin-top:2px;">BFS Nodes: <span id="res-ai-nodes-bfs">0</span></p>
-                    </div>
-                </div>
-                <button class="btn primary mt-4" onclick="closeModalAndReset()">Play Again</button>
-            </div>
-        </div>
-        
         <!-- Intro cinematic overlay -->
         <div id="intro-overlay" class="intro-overlay">
-            <div class="intro-content">
-                <h1 class="cinematic-title">EMERGENCY EXIT PLANNER</h1>
-                <p>Initializing Building Topography...</p>
+            <div class="text-center">
+                <h1 class="cinematic-title text-5xl font-['Space_Grotesk'] text-primary logo-glitch font-bold tracking-widest uppercase mb-4">AEGIS SIMULATION</h1>
+                <p class="text-on-surface-variant font-['Space_Grotesk'] tracking-[0.2em] uppercase text-sm">Initializing Tactical Topography...</p>
+            </div>
+        </div>
+
+        <!-- Simulation Modal / Overlay for Results -->
+        <div id="results-modal" class="absolute inset-0 bg-black/80 flex items-center justify-center z-[150] pointer-events-auto hidden">
+            <div class="glass border border-primary/30 p-8 w-full max-w-xl glow-border">
+                <h2 id="modal-title" class="text-2xl font-bold font-['Space_Grotesk'] uppercase tracking-widest text-primary mb-6">Simulation Complete</h2>
+                <div class="grid grid-cols-2 gap-6 mb-6">
+                    <div class="border border-outline-variant/40 p-4 bg-surface-container-low/50">
+                        <h3 class="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-2">Human Attempt</h3>
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-xs text-on-surface-variant">Time:</span>
+                            <span class="font-['Space_Grotesk'] text-lg font-bold text-on-surface"><span id="res-human-time">0</span>s</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs text-on-surface-variant">Status:</span>
+                            <span class="font-['Space_Grotesk'] text-sm font-bold secondary" id="res-human-status">Trapped</span>
+                        </div>
+                    </div>
+                    <div class="border border-primary/40 p-4 bg-primary/5">
+                        <h3 class="text-[10px] text-primary uppercase tracking-widest font-bold mb-2">AI Attempt (A*)</h3>
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-xs text-on-surface-variant">Time:</span>
+                            <span class="font-['Space_Grotesk'] text-lg font-bold text-primary"><span id="res-ai-time">0</span>s</span>
+                        </div>
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-xs text-on-surface-variant">Path Cost:</span>
+                            <span class="font-['Space_Grotesk'] text-sm font-bold text-on-surface" id="res-ai-cost">0</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs text-on-surface-variant">Nodes Ex.:</span>
+                            <span class="font-['Space_Grotesk'] text-sm font-bold text-on-surface" id="res-ai-nodes">0</span>
+                        </div>
+                    </div>
+                </div>
+                <button class="w-full py-3 bg-primary text-[#00363d] font-bold tracking-widest uppercase font-['Space_Grotesk'] text-sm hover:brightness-125 transition-all outline-none" onclick="closeModalAndReset()">Acknowledge & Restart</button>
+            </div>
+        </div>
+
+        <!-- Educational Information Modal -->
+        <div id="info-modal" class="absolute inset-0 bg-black/80 flex items-center justify-center z-[150] pointer-events-auto hidden">
+            <div class="glass border border-primary/30 p-8 w-full max-w-2xl glow-border relative">
+                <button onclick="toggleInfoModal()" class="absolute top-4 right-4 text-primary hover:text-white transition-colors">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+                <h2 class="text-2xl font-bold font-['Space_Grotesk'] uppercase tracking-widest text-primary mb-4">Project Context & The A* Algorithm</h2>
+                
+                <div class="space-y-4 text-sm text-on-surface-variant font-['Inter'] leading-relaxed">
+                    <p>The <strong>Intelligent Emergency Exit Planner</strong> is designed to showcase how Artificial Intelligence pathfinding can be critically applied in dynamic disaster scenarios.</p>
+                    
+                    <h3 class="text-primary font-bold font-['Space_Grotesk'] tracking-widest uppercase mt-4">Why We Built This</h3>
+                    <p>During a fast-spreading indoor hazard (like a building fire), human visibility and cognitive decision-making are severely impaired. Autonomous rescue units—such as <strong>robot quadrupeds or tactical drones</strong>—can navigate these environments using robust mathematical pathfinding, predicting active fire zones to map out the safest evacuation routes or locate trapped survivors.</p>
+
+                    <h3 class="text-primary font-bold font-['Space_Grotesk'] tracking-widest uppercase mt-4">How The A* (A-Star) Algorithm Works</h3>
+                    <p>The A* algorithm guarantees the shortest mathematically possible path. It calculates physical routes using two factors: <strong>G-Cost</strong> (how far the drone has traveled from the start) and <strong>H-Cost</strong> (a heuristic estimate of how far the drone is from the exit).</p>
+                    <p>In this simulation, we artificially inflate the cost of nodes adjacent to spreading fires. This forces the AI drone to aggressively seek safer detours around the hazard, even if it requires traversing a much longer physical distance, ensuring survival over speed.</p>
+                </div>
+                <button class="w-full mt-6 py-3 bg-primary/10 border border-primary text-primary font-bold tracking-widest uppercase font-['Space_Grotesk'] text-sm hover:bg-primary hover:text-[#00363d] transition-all outline-none" onclick="toggleInfoModal()">Dismiss Information</button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Info Toggle Button -->
+    <button onclick="toggleInfoModal()" class="fixed bottom-16 right-6 w-12 h-12 bg-surface/80 border border-primary/40 rounded-full flex items-center justify-center text-primary glow-border hover:bg-primary/20 backdrop-blur z-[60] pointer-events-auto transition-all outline-none">
+        <span class="material-symbols-outlined pointer-events-none">lightbulb</span>
+    </button>
+
+    <!-- Header Overlay -->
+    <header class="fixed top-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-[#0a0a0a]/80 backdrop-blur-xl border-b border-primary/20 pointer-events-auto shadow-[0_0_15px_rgba(0,229,255,0.1)]">
+        <div class="text-xl font-bold text-primary tracking-tighter font-['Space_Grotesk'] uppercase logo-glitch">AEGIS_SIM</div>
+        
+        <div class="flex items-center gap-4">
+            <div class="font-['Space_Grotesk'] text-[10px] uppercase text-primary border border-primary/20 px-3 py-1 bg-primary/10 tracking-[0.2em] rounded-sm">Confidential</div>
+            <button onclick="toggleSettingsModal()" class="w-8 h-8 flex items-center justify-center rounded bg-surface border border-outline-variant text-on-surface hover:text-primary hover:border-primary transition-colors outline-none cursor-pointer">
+                <span class="material-symbols-outlined text-sm">settings</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Settings Dropdown Modal -->
+    <div id="settings-modal" class="fixed top-20 right-6 w-72 glass border border-primary/30 p-5 glow-border z-[100] hidden pointer-events-auto">
+        <h3 class="font-['Space_Grotesk'] text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-4">Audio Configuration</h3>
+        
+        <div class="flex flex-col gap-4">
+            <label class="flex items-center justify-between cursor-pointer group">
+                <span class="font-['Space_Grotesk'] text-xs font-bold uppercase tracking-widest text-on-surface group-hover:text-primary transition-colors">BGM Link</span>
+                <input type="checkbox" id="toggle-bgm" onchange="updateAudioSettings()" class="sr-only peer">
+                <div class="w-8 h-4 bg-surface-container-low border border-outline-variant peer-focus:outline-none peer-checked:bg-primary/20 peer-checked:border-primary relative transition-colors rounded-sm">
+                    <div class="w-3 h-3 bg-slate-500 peer-checked:bg-primary absolute top-[1px] left-[1px] peer-checked:translate-x-[14px] transition-transform rounded-sm"></div>
+                </div>
+            </label>
+            
+            <label class="flex items-center justify-between cursor-pointer group">
+                <span class="font-['Space_Grotesk'] text-xs font-bold uppercase tracking-widest text-secondary group-hover:brightness-125 transition-all">Aag Protocol</span>
+                <input type="checkbox" id="toggle-aag" onchange="updateAudioSettings()" class="sr-only peer">
+                <div class="w-8 h-4 bg-surface-container-low border border-outline-variant peer-focus:outline-none peer-checked:bg-secondary/20 peer-checked:border-secondary relative transition-colors rounded-sm">
+                    <div class="w-3 h-3 bg-slate-500 peer-checked:bg-secondary absolute top-[1px] left-[1px] peer-checked:translate-x-[14px] transition-transform rounded-sm"></div>
+                </div>
+            </label>
+        </div>
+        <p class="text-[8px] text-slate-500 mt-4 leading-tight uppercase font-['Inter']">Note: Audio playback requires placing 'bgm.mp3' and 'aag.mp3' in the local audio/ directory.</p>
+    </div>
+
+    <!-- Sidebar Dashboard -->
+    <aside class="sidebar fixed right-6 top-24 w-72 flex flex-col gap-4 z-40 pointer-events-auto" style="display: none;">
+        <section class="glass border-2 glow-border p-5 relative overflow-hidden">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-['Space_Grotesk'] text-[10px] font-bold text-primary uppercase tracking-[0.2em]">Tactical Control</h3>
+                <span class="w-2 h-2 rounded-full bg-primary animate-ping"></span>
+            </div>
+            
+            <div class="flex gap-2 mb-4 font-['Space_Grotesk'] text-[10px] tracking-widest font-bold uppercase transition-all">
+                <div class="flex-1 text-center py-2 border border-primary text-primary bg-primary/10" id="phase1-badge">Phase_1 / Usr</div>
+                <div class="flex-1 text-center py-2 border border-outline-variant text-slate-500" id="phase2-badge">Phase_2 / AI</div>
+            </div>
+
+            <div class="flex flex-col gap-3">
+                <button id="btn-start" onclick="startSim()" class="flex items-center justify-between w-full px-4 py-2 border border-primary/40 text-primary hover:bg-primary/20 transition-all group outline-none">
+                    <span class="font-['Space_Grotesk'] text-xs font-bold uppercase tracking-widest">Execute Sim</span>
+                    <span class="material-symbols-outlined text-sm group-hover:translate-x-1 transition-transform">play_arrow</span>
+                </button>
+                <button id="btn-generate" onclick="generateNewMap()" class="flex items-center justify-between w-full px-4 py-2 border border-outline-variant/40 text-on-surface-variant hover:bg-surface-container-low transition-colors outline-none">
+                    <span class="font-['Space_Grotesk'] text-xs font-bold uppercase tracking-widest">Randomize</span>
+                    <span class="material-symbols-outlined text-sm">shuffle</span>
+                </button>
+            </div>
+        </section>
+
+        <section class="glass border-2 glow-border p-5">
+            <h3 class="font-['Space_Grotesk'] text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-4">Live Telemetry</h3>
+            <div class="space-y-3">
+                <div class="flex flex-col gap-1">
+                    <div class="flex justify-between text-[10px] font-['Space_Grotesk'] uppercase text-primary">
+                        <span>Mode</span>
+                        <span id="val-mode" class="truncate ml-2 text-right">Loading</span>
+                    </div>
+                </div>
+                <div class="flex flex-col gap-1">
+                    <div class="flex justify-between text-[10px] font-['Space_Grotesk'] uppercase text-on-surface">
+                        <span>Timer</span>
+                        <span id="val-timer" class="font-bold text-sm tracking-widest">00:00.0</span>
+                    </div>
+                </div>
+            </div>
+
+            <div id="ai-metrics" style="display:none;" class="mt-4 pt-4 border-t border-outline-variant/30 space-y-2">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <p class="text-[8px] text-slate-500 uppercase font-['Space_Grotesk'] tracking-widest">Path Cost</p>
+                        <p class="text-lg font-bold font-['Space_Grotesk'] text-tertiary" id="val-cost">0</p>
+                    </div>
+                    <div>
+                        <p class="text-[8px] text-slate-500 uppercase font-['Space_Grotesk'] tracking-widest">Comp Time</p>
+                        <p class="text-lg font-bold font-['Space_Grotesk'] text-on-surface" id="val-compute-time">0</p>
+                    </div>
+                    <div>
+                        <p class="text-[8px] text-slate-500 uppercase font-['Space_Grotesk'] tracking-widest">A* Nodes</p>
+                        <p class="text-sm font-bold font-['Space_Grotesk'] text-primary" id="val-nodes">0</p>
+                    </div>
+                    <div>
+                        <p class="text-[8px] text-slate-500 uppercase font-['Space_Grotesk'] tracking-widest">BFS Nodes</p>
+                        <p class="text-sm font-bold font-['Space_Grotesk'] text-slate-400" id="val-nodes-bfs">0</p>
+                    </div>
+                </div>
+            </div>
+            
+            <p id="human-instructions" class="text-[10px] font-['Space_Grotesk'] text-slate-400 mt-4 leading-relaxed uppercase border p-2 border-outline-variant/30 bg-surface-container-low/50">
+                OVERRIDE ENABLED: USE <span class="text-primary">W A S D</span> TO NAVIGATE TO GREEN EXIT SECTOR. AVOID HAZARDS.
+            </p>
+        </section>
+    </aside>
+
+    <!-- Bottom Left Readout -->
+    <div class="absolute bottom-16 left-6 flex flex-col gap-1 z-40 pointer-events-none">
+        <h1 class="text-3xl font-['Space_Grotesk'] font-bold tracking-tighter text-on-surface leading-none opacity-50">
+            AEGIS_SIM<br/><span class="text-primary drop-shadow-[0_0_8px_#00E5FF]">RUN_0492</span>
+        </h1>
+        <div class="flex gap-4 mt-2">
+            <div class="flex items-center gap-2 bg-surface-container-low/80 backdrop-blur px-2 py-1 border-l-2 border-primary">
+                <span class="text-[8px] font-['Space_Grotesk'] text-primary uppercase font-bold tracking-widest" id="ticker-status">Status: Nominal</span>
             </div>
         </div>
     </div>
 
-    <!-- Sidebar Controls Overlay (Moved outside HUD container to guarantee clicks) -->
-    <aside class="sidebar glass-panel" style="display: none;">
-        <h1 class="logo glow-text_red">Emergency <span>Planner</span></h1>
-        
-        <div class="phase-indicator">
-            <div class="phase-badge active" id="phase1-badge">Phase 1: Human</div>
-            <div class="phase-badge" id="phase2-badge">Phase 2: AI (A*)</div>
+    <!-- Live System Log Ticker -->
+    <div class="ticker-wrap w-full py-1">
+        <div class="ticker font-['Space_Grotesk'] text-[10px] tracking-[0.3em] text-primary font-bold uppercase" id="log-ticker">
+            <!-- Dynamic Logs will be injected here via main.js -->
+            <span class="mx-8">System Initialized</span>
+            <span class="mx-8 text-secondary">Awaiting Parameters</span>
+            <span class="mx-8">System Initialized</span>
+            <span class="mx-8 text-secondary">Awaiting Parameters</span>
+            <span class="mx-8">System Initialized</span>
+            <span class="mx-8 text-secondary">Awaiting Parameters</span>
+            <span class="mx-8">System Initialized</span>
         </div>
-
-        <div class="controls-section">
-            <h2>Simulation Controls</h2>
-            <div class="btn-group">
-                <button class="btn primary" id="btn-start" onclick="startSim()">Start Simulation</button>
-                <button class="btn secondary" id="btn-generate" onclick="generateNewMap()">Generate New Map</button>
-            </div>
-        </div>
-
-        <div class="status-panel mt-4">
-            <h2>Live Status</h2>
-            <div class="metric-row">
-                <span class="metric-label">Mode:</span>
-                <span class="metric-value" id="val-mode">Loading...</span>
-            </div>
-            <div class="metric-row">
-                <span class="metric-label">Time Elapsed:</span>
-                <span class="metric-value timer-glow" id="val-timer">00:00.0</span>
-            </div>
-        </div>
-
-        <div class="metrics-panel mt-4" id="ai-metrics" style="display: none;">
-            <h2>AI Performance</h2>
-            <div class="metric-row">
-                <span class="metric-label">Path Cost:</span>
-                <span class="metric-value highlight" id="val-cost">-</span>
-            </div>
-            <div class="metric-row">
-                <span class="metric-label">Nodes (A*):</span>
-                <span class="metric-value highlight" id="val-nodes">-</span>
-            </div>
-            <div class="metric-row">
-                <span class="metric-label">Nodes (BFS):</span>
-                <span class="metric-value" id="val-nodes-bfs" style="color:var(--text-muted);">-</span>
-            </div>
-            <div class="metric-row">
-                <span class="metric-label">Compute Time:</span>
-                <span class="metric-value highlight" id="val-compute-time">-</span>
-            </div>
-        </div>
-        
-        <div class="instructions mt-4" id="human-instructions">
-            <strong>Controls:</strong> Use <strong>W A S D</strong> or <strong>Arrows</strong> to manually navigate to the glowing green exit! Avoid the red flames. Mouse drag to rotate camera.
-        </div>
-
-    </aside>
+    </div>
 
     <!-- Scripts -->
     <script src="js/map.js"></script>

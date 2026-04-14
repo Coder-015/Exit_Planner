@@ -93,37 +93,39 @@ class Engine3D {
                 metalness: 0.0
             }),
             floorExplored: new THREE.MeshStandardMaterial({
-                color: 0xf8c51c,
+                color: 0x00E5FF,
                 roughness: 0.7,
-                emissive: 0xf8c51c,
-                emissiveIntensity: 0.2
+                emissive: 0x00E5FF,
+                emissiveIntensity: 0.1,
+                transparent: true,
+                opacity: 0.5
             }),
             fire: new THREE.MeshStandardMaterial({
-                color: 0xff4b4b,
-                emissive: 0xff4b4b,
+                color: 0xFF5722,
+                emissive: 0xFF5722,
                 emissiveIntensity: 1.5,
                 roughness: 0.4
             }),
             fireCore: new THREE.MeshStandardMaterial({
-                color: 0xf8c51c,
-                emissive: 0xf8c51c,
+                color: 0xffdbd1,
+                emissive: 0xffdbd1,
                 emissiveIntensity: 2.0,
                 roughness: 0.2
             }),
             exit: new THREE.MeshStandardMaterial({
-                color: 0x3fb950,
-                emissive: 0x3fb950,
+                color: 0xb6ffae,
+                emissive: 0xb6ffae,
                 emissiveIntensity: 1.2
             }),
             playerHuman: new THREE.MeshStandardMaterial({
-                color: 0x2f81f7,
-                emissive: 0x2f81f7,
+                color: 0x00E5FF,
+                emissive: 0x00E5FF,
                 emissiveIntensity: 0.8
             }),
             playerAI: new THREE.MeshStandardMaterial({
-                color: 0xf8c51c,
-                emissive: 0xf8c51c,
-                emissiveIntensity: 0.8
+                color: 0x00E5FF,
+                emissive: 0x00E5FF,
+                emissiveIntensity: 1.2
             })
         };
         
@@ -151,7 +153,7 @@ class Engine3D {
         this.scene.add(dirLight);
         
         // Player Spotlight (attached to player later)
-        this.playerLight = new THREE.PointLight(0x2f81f7, 1.5, 20);
+        this.playerLight = new THREE.PointLight(0x00E5FF, 1.5, 20);
         // Cast shadow disabled for significant performance gain
         this.playerLight.castShadow = false; 
         this.scene.add(this.playerLight);
@@ -178,11 +180,11 @@ class Engine3D {
         overlay.style.opacity = '1';
         
         document.querySelector('.cinematic-title').style.opacity = '0';
-        document.querySelector('.intro-content p').style.opacity = '0';
+        document.querySelector('#intro-overlay p').style.opacity = '0';
         
         // Tween HTML overlay
         gsap.to('.cinematic-title', { opacity: 1, scale: 1, duration: 1.5, delay: 0.5, ease: 'power3.out' });
-        gsap.to('.intro-content p', { opacity: 1, duration: 1, delay: 1.5 });
+        gsap.to('#intro-overlay p', { opacity: 1, duration: 1, delay: 1.5 });
         
         // Animate out overlay
         gsap.to('#intro-overlay', { opacity: 0, duration: 1.5, delay: 3.5, onComplete: () => {
@@ -215,6 +217,7 @@ class Engine3D {
     }
 
     build3DMap(mapData) {
+        this.mapData = mapData; // Save for fire respawner
         this.map = mapData.grid;
         this.gridSize = mapData.cols;
         this.player = { ...mapData.playerSpawn };
@@ -271,16 +274,41 @@ class Engine3D {
             this.exitsGroup.add(mesh);
             
             // Add green light
-            const l = new THREE.PointLight(0x3fb950, 1.5, 15);
+            const l = new THREE.PointLight(0xb6ffae, 1.5, 15);
             l.position.set(this.getCoord(ex.x), 2, this.getCoord(ex.y));
             this.exitsGroup.add(l);
         }
         
-        // Player
-        const playerGeo = new THREE.SphereGeometry(cs*0.4, 32, 32);
-        this.playerMesh = new THREE.Mesh(playerGeo, this.materials.playerHuman);
-        this.playerMesh.position.set(this.getCoord(this.player.x), cs*0.4, this.getCoord(this.player.y));
-        this.playerMesh.castShadow = true;
+        // Player (Stylized Humanoid)
+        this.playerMesh = new THREE.Group();
+        const mat = this.materials.playerHuman;
+        
+        const headGeo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+        const head = new THREE.Mesh(headGeo, mat);
+        head.position.y = 1.0;
+        
+        const torsoGeo = new THREE.BoxGeometry(0.7, 0.8, 0.4);
+        const torso = new THREE.Mesh(torsoGeo, mat);
+        torso.position.y = 0.4;
+        
+        const armGeo = new THREE.BoxGeometry(0.25, 0.7, 0.25);
+        armGeo.translate(0, -0.25, 0);
+        this.armL = new THREE.Mesh(armGeo, mat);
+        this.armL.position.set(-0.5, 0.7, 0);
+        
+        this.armR = new THREE.Mesh(armGeo, mat);
+        this.armR.position.set(0.5, 0.7, 0);
+        
+        const legGeo = new THREE.BoxGeometry(0.3, 0.7, 0.3);
+        legGeo.translate(0, -0.35, 0);
+        this.legL = new THREE.Mesh(legGeo, mat);
+        this.legL.position.set(-0.2, 0.0, 0);
+        
+        this.legR = new THREE.Mesh(legGeo, mat);
+        this.legR.position.set(0.2, 0.0, 0);
+        
+        this.playerMesh.add(head, torso, this.armL, this.armR, this.legL, this.legR);
+        this.playerMesh.position.set(this.getCoord(this.player.x), 0.7, this.getCoord(this.player.y));
         this.scene.add(this.playerMesh);
         
         // Initial Fires
@@ -297,7 +325,7 @@ class Engine3D {
             this.playIntro(); // Also triggers camera flyover
         } else {
             // Reset player and fire to initial state of the current map
-            this.playerMesh.position.set(this.getCoord(this.player.x), this.cellSize*0.4, this.getCoord(this.player.y));
+            this.playerMesh.position.set(this.getCoord(this.player.x), 0.7, this.getCoord(this.player.y));
             this.syncFireMeshes();
             
             // Clear explored floors
@@ -322,8 +350,8 @@ class Engine3D {
         this.isPlaying = true;
         this.startTime = performance.now();
         this.lastFireTime = performance.now();
-        this.playerMesh.material = this.materials.playerHuman;
-        this.playerLight.color.setHex(0x2f81f7);
+        this.playerMesh.children.forEach(c => c.material = this.materials.playerHuman);
+        this.playerLight.color.setHex(0x00E5FF);
     }
 
     startAiPhase(gridCopy, fireSetCopy, playerStart) {
@@ -334,8 +362,8 @@ class Engine3D {
         
         this.reset(true); // Reset visually to current map
         
-        this.playerMesh.material = this.materials.playerAI;
-        this.playerLight.color.setHex(0xf8c51c);
+        this.playerMesh.children.forEach(c => c.material = this.materials.playerAI);
+        this.playerLight.color.setHex(0x00E5FF);
         
         this.isPlaying = true;
         this.startTime = performance.now();
@@ -375,18 +403,25 @@ class Engine3D {
     }
 
     spawnRandomFire() {
-        let placed = false;
-        let attempts = 0;
-        while (!placed && attempts < 100) {
-            const x = Math.floor(Math.random() * this.gridSize);
-            const y = Math.floor(Math.random() * this.gridSize);
-            const dist = Math.abs(x - this.player.x) + Math.abs(y - this.player.y);
-            if (this.map[y][x] === 0 && dist > 10) {
-                this.fireSet.add(`${x},${y}`);
-                placed = true;
+        if (!this.mapData || !this.mapData.rooms || this.mapData.rooms.length === 0) return;
+        
+        // Pick a room far from player
+        const possibleRooms = this.mapData.rooms.filter(r => 
+            Math.abs((r.x + Math.floor(r.w/2)) - this.player.x) > 5 ||
+            Math.abs((r.y + Math.floor(r.h/2)) - this.player.y) > 5
+        );
+        
+        const targetRoom = possibleRooms.length > 0 ? possibleRooms[Math.floor(Math.random() * possibleRooms.length)] : this.mapData.rooms[0];
+        
+        // Seed 2-3 fire blocks in the same room to create a cluster origin
+        for(let i=0; i<3; i++) {
+            const fx = targetRoom.x + Math.floor(Math.random() * targetRoom.w);
+            const fy = targetRoom.y + Math.floor(Math.random() * targetRoom.h);
+            if (this.map[fy][fx] === 0) {
+                this.fireSet.add(`${fx},${fy}`);
             }
-            attempts++;
         }
+        
         this.syncFireMeshes();
     }
 
@@ -479,12 +514,21 @@ class Engine3D {
 
             if (this.phase !== 1 || !this.isPlaying) return;
             
-            let dx = 0, dy = 0;
-            if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') dy = -1;
-            else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') dy = 1;
-            else if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') dx = -1;
-            else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') dx = 1;
-            else return;
+            let mapDx = 0, mapDy = 0;
+            if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') mapDy = -1;
+            else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') mapDy = 1;
+            else if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') mapDx = -1;
+            else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') mapDx = 1;
+            
+            if (mapDx === 0 && mapDy === 0) return;
+            
+            let dx = mapDx;
+            let dy = mapDy;
+            
+            if (this.isPlayerMoving) {
+                this.nextMoveCommand = { dx, dy };
+                return;
+            }
             
             this.movePlayer(dx, dy);
         }, { passive: false });
@@ -499,16 +543,44 @@ class Engine3D {
                 this.player.x = nx;
                 this.player.y = ny;
                 
+                this.isPlayerMoving = true; // Lock input
+                
                 // Tween model in 3D
                 gsap.to(this.playerMesh.position, {
                     x: this.getCoord(nx),
                     z: this.getCoord(ny),
-                    duration: 0.12, // Faster, punchier transition
-                    ease: "power2.out" // Smoother slide into cell
+                    duration: 0.18, 
+                    ease: "power1.out",
+                    onComplete: () => {
+                        this.isPlayerMoving = false; // Unlock input
+                        this.checkWinLoss(); // Check win condition after moving
+                        
+                        if (this.nextMoveCommand) {
+                            let cmd = this.nextMoveCommand;
+                            this.nextMoveCommand = null;
+                            this.movePlayer(cmd.dx, cmd.dy);
+                        }
+                    }
+                });
+                
+                // The Hop!
+                gsap.to(this.playerMesh.position, {
+                    y: 1.5,
+                    yoyo: true,
+                    repeat: 1,
+                    duration: 0.09,
+                    ease: "sine.inOut"
+                });
+                
+                // Rotate to face direction
+                const angle = Math.atan2(dx, dy);
+                gsap.to(this.playerMesh.rotation, {
+                    y: angle,
+                    duration: 0.15,
+                    ease: "power2.out"
                 });
                 
                 this.updatePlayerLight();
-                this.checkWinLoss();
             }
         }
     }
@@ -544,6 +616,12 @@ class Engine3D {
     
     endGame(result) {
         this.isPlaying = false;
+        
+        // Trigger Meme if human burns to death
+        if (this.phase === 1 && result === 'Loss') {
+            if (window.triggerAagMeme) window.triggerAagMeme();
+        }
+        
         if (this.onGameOver) this.onGameOver(result, this.elapsedTime);
     }
 
@@ -576,14 +654,31 @@ class Engine3D {
             if (this.phase === 2 && timestamp - this.lastAiMoveTime > 200) {
                 if (this.aiPathIndex < this.aiPath.length) {
                     const nextNode = this.aiPath[this.aiPathIndex];
+                    const dx = nextNode.x - this.player.x;
+                    const dy = nextNode.y - this.player.y;
+                    
                     this.player.x = nextNode.x;
                     this.player.y = nextNode.y;
                     
                     gsap.to(this.playerMesh.position, {
                         x: this.getCoord(nextNode.x),
                         z: this.getCoord(nextNode.y),
-                        duration: 0.15, // Smooth constant speed
-                        ease: "linear"
+                        duration: 0.18, // Match human speed
+                        ease: "power1.out"
+                    });
+                    
+                    gsap.to(this.playerMesh.position, {
+                        y: 1.5,
+                        yoyo: true,
+                        repeat: 1,
+                        duration: 0.09,
+                        ease: "sine.inOut"
+                    });
+                    
+                    const angle = Math.atan2(dx, dy);
+                    gsap.to(this.playerMesh.rotation, {
+                        y: angle,
+                        duration: 0.1
                     });
                     
                     this.updatePlayerLight();
@@ -602,20 +697,49 @@ class Engine3D {
         const time = timestamp;
         this.fireGroup.children.forEach(cluster => {
             if (cluster.userData) {
-                // Throb scale
                 const scaleVal = 0.8 + Math.sin(time * 0.005 + cluster.userData.offset) * 0.3;
                 cluster.scale.set(scaleVal, scaleVal, scaleVal);
                 
-                // Spin children
                 cluster.children[0].rotation.y += cluster.userData.speed;
                 cluster.children[0].rotation.x += cluster.userData.speed * 0.5;
                 
                 cluster.children[1].rotation.y -= cluster.userData.speed * 0.8;
                 cluster.children[1].rotation.z += cluster.userData.speed;
                 
-                cluster.children[2].rotation.y += 0.1; // Core spins fast
+                cluster.children[2].rotation.y += 0.1; 
             }
         });
+        
+        // Animate Humanoid Limbs
+        if (this.armL) {
+            const logicalX = this.getCoord(this.player.x);
+            const logicalZ = this.getCoord(this.player.y);
+            const dist = Math.abs(this.playerMesh.position.x - logicalX) + Math.abs(this.playerMesh.position.z - logicalZ);
+            
+            if (dist > 0.1) {
+                // Running cycle
+                const speed = time * 0.03;
+                this.armL.rotation.x = Math.sin(speed) * 1.5;
+                this.armR.rotation.x = Math.sin(speed + Math.PI) * 1.5;
+                this.legL.rotation.x = Math.sin(speed + Math.PI) * 1.2;
+                this.legR.rotation.x = Math.sin(speed) * 1.2;
+            } else {
+                // Stand idle
+                this.armL.rotation.x = 0;
+                this.armR.rotation.x = 0;
+                this.legL.rotation.x = 0;
+                this.legR.rotation.x = 0;
+            }
+        }
+        
+        // Smooth Lazy Camera Chase
+        if (this.playerMesh) {
+            // The camera "look" target chases the player
+            this.controls.target.lerp(new THREE.Vector3(this.playerMesh.position.x, 0, this.playerMesh.position.z), 0.1);
+            
+            // Allow OrbitControls to do its math, then we add a tiny float for dramatic flair
+            this.camera.position.y += Math.sin(time*0.001)*0.01; 
+        }
         
         this.controls.update();
         this.renderer.render(this.scene, this.camera);
